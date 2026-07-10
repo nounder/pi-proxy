@@ -39,6 +39,10 @@ interface ProxyRule {
 }
 
 interface ProxyConfig {
+	/**
+	 * Opt-in. Default false — nothing is proxied until set true
+	 * in config or via `/proxy on`.
+	 */
 	enabled?: boolean;
 	/** Default HTTP(S) proxy URL, e.g. "http://127.0.0.1:7890" */
 	proxy?: string;
@@ -113,7 +117,8 @@ function normalizeConfig(raw: unknown): ProxyConfig {
 		}
 	}
 	return {
-		enabled: raw.enabled !== false,
+		// Opt-in only: missing/undefined/false → off
+		enabled: raw.enabled === true,
 		proxy: typeof raw.proxy === "string" ? raw.proxy : process.env.PI_PROXY || undefined,
 		notify: raw.notify !== false,
 		status: raw.status !== false,
@@ -137,6 +142,7 @@ async function loadConfig(): Promise<{ config: ProxyConfig; error?: string }> {
 			const envProxy = process.env.PI_PROXY;
 			const envModels = process.env.PI_PROXY_MODELS;
 			if (envProxy && envModels) {
+				// Env pair is an explicit opt-in (no config file)
 				return {
 					config: normalizeConfig({
 						enabled: true,
@@ -166,7 +172,7 @@ function resolveProxyForModel(
 	provider: string,
 	modelId: string,
 ): string | undefined {
-	if (config.enabled === false) return undefined;
+	if (config.enabled !== true) return undefined;
 	const key = `${provider}/${modelId}`;
 	const rules = config.rules ?? [];
 	for (const rule of rules) {
@@ -651,23 +657,36 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("proxy", {
-		description: "Show or reload pi-proxy status",
+		description: "Show or control pi-proxy (off by default; /proxy on to enable)",
 		handler: async (args, ctx) => {
 			const sub = (args ?? "").trim().toLowerCase();
 			if (sub === "reload") {
 				await reloadConfig(ctx);
-				ctx.ui.notify("pi-proxy: config reloaded", "info");
+				ctx.ui.notify(
+					`pi-proxy: config reloaded (enabled=${config.enabled === true})`,
+					"info",
+				);
 				return;
 			}
 			if (sub === "off") {
 				config = { ...config, enabled: false };
 				deactivate(ctx);
-				ctx.ui.notify("pi-proxy: disabled for this session", "info");
+				ctx.ui.notify("pi-proxy: off (session)", "info");
 				return;
 			}
 			if (sub === "on") {
-				await reloadConfig(ctx);
-				config = { ...config, enabled: true };
+				// Keep rules/proxy from disk, force enable for this session only
+				const prevEnabled = config.enabled;
+				const { config: next, error } = await loadConfig();
+				config = { ...next, enabled: true };
+				configError = error;
+				if (!config.proxy && !(config.rules?.some((r) => r.proxy))) {
+					ctx.ui.notify(
+						"pi-proxy: no proxy URL configured — set proxy in pi-proxy.json",
+						"error",
+					);
+					return;
+				}
 				if (ctx.model) {
 					await activateForModel(
 						ctx,
@@ -677,7 +696,16 @@ export default function (pi: ExtensionAPI) {
 						"set",
 					);
 				}
-				ctx.ui.notify("pi-proxy: enabled", "info");
+				if (!active) {
+					ctx.ui.notify(
+						"pi-proxy: on, but current model not in rules (direct)",
+						"warning",
+					);
+				} else if (prevEnabled !== true) {
+					// activateForModel already notified on connect
+				} else {
+					ctx.ui.notify("pi-proxy: on", "info");
+				}
 				return;
 			}
 			if (sub === "probe") {
@@ -698,7 +726,7 @@ export default function (pi: ExtensionAPI) {
 
 			const lines = [
 				`config: ${configPath()}`,
-				`enabled: ${config.enabled !== false}`,
+				`enabled: ${config.enabled === true}  (opt-in; /proxy on)`,
 				`default proxy: ${config.proxy ? shortProxy(config.proxy) : "(none)"}`,
 				`rules: ${config.rules?.length ?? 0}`,
 			];

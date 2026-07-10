@@ -1,13 +1,21 @@
 # pi-proxy
 
-Route **selected** pi models through an HTTP(S) proxy. Unmatched models stay direct.
+Route **selected** pi models through an HTTP(S) proxy. **Off by default** — opt-in only.
 
 ```bash
 pi install git:github.com/nounder/pi-proxy
-# or: pi install /path/to/pi-proxy
 ```
 
-Needs a local **HTTP** proxy (`http://host:port`). SOCKS/PAC not supported — use the HTTP port most VPN clients expose.
+Needs local **HTTP** proxy (`http://host:port`). SOCKS/PAC not supported.
+
+## Enable
+
+1. Write rules + proxy URL in config (still disabled)
+2. Turn on:
+   - `/proxy on` — this session, or
+   - `"enabled": true` in config — every session
+
+Unmatched models always stay direct. Matched models stay direct until enabled.
 
 ## Config
 
@@ -15,7 +23,7 @@ Needs a local **HTTP** proxy (`http://host:port`). SOCKS/PAC not supported — u
 
 ```json
 {
-  "enabled": true,
+  "enabled": false,
   "proxy": "http://127.0.0.1:7890",
   "notify": true,
   "status": true,
@@ -28,18 +36,19 @@ Needs a local **HTTP** proxy (`http://host:port`). SOCKS/PAC not supported — u
 
 | field | meaning |
 |-------|---------|
+| `enabled` | **opt-in** (default `false`) |
 | `proxy` | default HTTP proxy URL |
 | `rules[].match` | glob: `provider/model`, `provider/*`, `*` |
 | `rules[].proxy` | optional override per rule |
-| `models` | shorthand list of globs (same as rules) |
-| `probe` | test proxy on model activate |
+| `models` | shorthand list of globs |
+| `probe` | test proxy on activate |
 
-Env alternatives:
+Env opt-in (enables immediately):
 
 ```bash
 export PI_PROXY=http://127.0.0.1:7890
 export PI_PROXY_MODELS=openai/*,anthropic/*
-# or
+# or config path only (still needs enabled:true in file):
 export PI_PROXY_CONFIG=/path/to.json
 ```
 
@@ -47,12 +56,13 @@ export PI_PROXY_CONFIG=/path/to.json
 
 ```
 /proxy          status
-/proxy reload   reread config
+/proxy on       enable this session
+/proxy off      disable this session
+/proxy reload   reread config (honors enabled in file)
 /proxy probe    test proxy
-/proxy on|off   session toggle
 ```
 
-Status bar shows `⇄ http://host:port` when active.
+Status bar: `⇄ http://host:port` only when active.
 
 ## How it works
 
@@ -224,15 +234,19 @@ wireproxy -c wg.conf   # [http] 127.0.0.1:7890
 
 ```json
 {
+  "enabled": false,
   "proxy": "http://127.0.0.1:7890",
   "rules": [{ "match": "openai/*" }]
 }
 ```
 
+Then `/proxy on` when you want it.
+
 **Clash already running:**
 
 ```json
 {
+  "enabled": true,
   "proxy": "http://127.0.0.1:7890",
   "rules": [{ "match": ["openai/*", "anthropic/*", "google/*"] }]
 }
