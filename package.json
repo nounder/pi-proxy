@@ -1,0 +1,40 @@
+{
+  "name": "pi-proxy",
+  "version": "0.1.0",
+  "description": "Route selected pi models through an HTTP(S) proxy",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi-coding-agent",
+    "proxy",
+    "http-proxy",
+    "wireguard",
+    "vpn"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nounder/pi-proxy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nounder/pi-proxy/issues"
+  },
+  "homepage": "https://github.com/nounder/pi-proxy#readme",
+  "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "dependencies": {
+    "undici": "^7.16.0"
+  },
+  "files": [
+    "extensions",
+    "config.example.json",
+    "README.md",
+    "LICENSE"
+  ]
+}

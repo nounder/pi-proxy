@@ -1,0 +1,16 @@
+{
+  "enabled": true,
+  "proxy": "http://127.0.0.1:7890",
+  "notify": true,
+  "status": true,
+  "probe": true,
+  "rules": [
+    {
+      "match": ["openai/*", "openai-codex/*", "anthropic/*"]
+    },
+    {
+      "match": "google/*",
+      "proxy": "http://127.0.0.1:7890"
+    }
+  ]
+}
